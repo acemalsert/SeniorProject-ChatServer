@@ -1,46 +1,49 @@
-const {Server} = require('socket.io');
-const dontenv = require('dotenv').config();
-const io = new Server({
-    cors:{
-        origin:"http://localhost:3000"
+const io = require("socket.io")(8900, {
+    cors: {
+      origin: "http://localhost:3000",
     },
-});
-
-let activeUsers = [];
-
-const addUser=(userId,socketId)=>{
-    !activeUsers.some((user) => user.userId === userId) && activeUsers.push({userId,socketId});
-}
-
-const removeUser = (socketId)=>{
-    activeUsers = activeUsers.filter(user=>user.socketId !== socketId);
-}
-const getUser = (userId)=>{
-    return activeUsers.find(user => user.userId === userId);
-}
-io.on("connection",(socket)=>{
-
-    socket.on("addUser",(userId)=>{
-        addUser(userId,socket.id);
-        io.emit("getUsers",activeUsers);
-    })
-
-    socket.on("sendMessage",({senderId,recieverId,text})=>{
-        const user = getUser(recieverId);
-        io.to(user.socketId).emit("getMessage",{
+  });
+  
+  let active_users = [];
+  
+  const addUser = (userId, socketId) => {
+    !active_users.some((user) => user.userId === userId) &&
+      active_users.push({ userId, socketId });
+  };
+  
+  const removeUser = (socketId) => {
+    active_users = active_users.filter((user) => user.socketId !== socketId);
+  };
+  
+  const getUser = (userId) => {
+    return active_users.find((user) => user.userId === userId);
+  };
+  
+  io.on("connection", (socket) => {
+    //when ceonnect
+    console.log("New connection with socketId",socket.id);
+  
+    //take userId and socketId from user
+    socket.on("addUser", (userId) => {
+        addUser(userId, socket.id);
+        io.emit("getUsers", active_users);
+    });
+  
+    //send and get message
+    socket.on("sendMessage", ({ senderId, receiverId, text }) => {
+      const user = getUser(receiverId);
+      if(user){
+          io.to(user.socketId).emit("getMessage", {
             senderId,
-            text
-        });
-    })
-
-    socket.on("disconnect",()=>{
-        removeUser(socket.id);
-        io.emit("getUsers",activeUsers);
-    })
-})
-
- 
-
-io.listen(process.env.PORT,()=>{
-    console.log("websocket server is running on port 8900...");
-})
+            text,
+          });
+      }
+    });
+  
+    //when disconnect
+    socket.on("disconnect", () => {
+      console.log(`[Disconnected] `,socket.id);
+      removeUser(socket.id);
+      io.emit("getUsers", active_users);
+    });
+  });
